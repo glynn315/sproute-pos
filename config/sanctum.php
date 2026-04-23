@@ -47,7 +47,8 @@ return [
     |
     */
 
-    'expiration' => null,
+    // Access tokens expire after N minutes (120 = 2 hours). Set null for no expiry.
+    'expiration' => env('SANCTUM_TOKEN_EXPIRATION', 120),
 
     /*
     |--------------------------------------------------------------------------
