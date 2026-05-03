@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Domain\Billing\Services\BillingService;
 use App\Domain\Tenants\Repositories\TenantRepository;
 use App\Domain\Tenants\Services\TenantService;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\InvoiceResource;
 use App\Http\Resources\SubscriptionPlanResource;
 use App\Http\Resources\TenantResource;
+use App\Models\Invoice;
 use App\Models\SubscriptionPlan;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use RuntimeException;
 
 class AdminController extends Controller
 {
@@ -19,6 +23,7 @@ class AdminController extends Controller
     public function __construct(
         private readonly TenantService    $tenantService,
         private readonly TenantRepository $repo,
+        private readonly BillingService   $billing,
     ) {}
 
     // ─── Tenants ──────────────────────────────────────────────────────────────
@@ -115,5 +120,62 @@ class AdminController extends Controller
         $p->update($data);
 
         return $this->success(new SubscriptionPlanResource($p->fresh()), 'Plan updated');
+    }
+
+    // ─── Invoices (verification & monitoring) ─────────────────────────────────
+
+    public function invoices(Request $request): JsonResponse
+    {
+        $perPage = min((int) $request->get('per_page', 20), 100);
+
+        $query = Invoice::with(['subscriptionPlan', 'tenant'])->latest('id');
+
+        if ($status = $request->get('status')) {
+            $query->where('status', $status);
+        }
+        if ($tenantId = $request->get('tenant_id')) {
+            $query->where('tenant_id', (int) $tenantId);
+        }
+
+        return $this->success(InvoiceResource::collection($query->paginate($perPage)));
+    }
+
+    /**
+     * Verify a submitted invoice. The admin pastes the actual GCash
+     * reference they see in the merchant app — the service compares it to
+     * what the tenant submitted before activating the plan.
+     */
+    public function verifyInvoice(Request $request, int $invoice): JsonResponse
+    {
+        $data = $request->validate([
+            'actual_reference_number' => ['nullable', 'string', 'max:64'],
+        ]);
+
+        $inv = Invoice::with('subscriptionPlan')->findOrFail($invoice);
+
+        try {
+            $updated = $this->billing->verifyPayment($inv, $data['actual_reference_number'] ?? null);
+        } catch (RuntimeException $e) {
+            return $this->error($e->getMessage(), 422);
+        }
+
+        return $this->success(new InvoiceResource($updated), 'Payment verified');
+    }
+
+    public function rejectInvoice(Request $request, int $invoice): JsonResponse
+    {
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $inv = Invoice::with('subscriptionPlan')->findOrFail($invoice);
+
+        try {
+            $updated = $this->billing->rejectPayment($inv, $data['reason'] ?? null);
+        } catch (RuntimeException $e) {
+            return $this->error($e->getMessage(), 422);
+        }
+
+        return $this->success(new InvoiceResource($updated), 'Payment rejected');
     }
 }

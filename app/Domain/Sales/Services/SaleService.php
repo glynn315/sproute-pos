@@ -96,10 +96,13 @@ class SaleService
                     'total'        => $ri['total'],
                 ]);
 
-                $before = $ri['product']->stock_quantity;
+                // Coerce null → 0 defensively. The column is NOT NULL by schema,
+                // but historical rows can carry NULL if they were inserted with
+                // strict mode off; using $before|null below would NULL the log row.
+                $before = (int) ($ri['product']->stock_quantity ?? 0);
                 $after  = $before - $ri['quantity'];
 
-                $ri['product']->decrement('stock_quantity', $ri['quantity']);
+                $ri['product']->update(['stock_quantity' => $after]);
 
                 InventoryLog::create([
                     'tenant_id'       => $dto->tenantId,
@@ -132,10 +135,18 @@ class SaleService
             // Restore inventory
             foreach ($sale->items as $item) {
                 $product = $item->product;
-                $before  = $product->stock_quantity;
-                $after   = $before + $item->quantity;
+                if (! $product) {
+                    // Product was deleted / FK orphaned — skip stock restore but
+                    // continue voiding so the sale itself can be flagged.
+                    continue;
+                }
 
-                $product->increment('stock_quantity', $item->quantity);
+                // Coerce null → 0. inventory_logs.quantity_before is NOT NULL,
+                // and using increment() on a NULL stock would leave it NULL.
+                $before = (int) ($product->stock_quantity ?? 0);
+                $after  = $before + $item->quantity;
+
+                $product->update(['stock_quantity' => $after]);
 
                 InventoryLog::create([
                     'tenant_id'       => $sale->tenant_id,

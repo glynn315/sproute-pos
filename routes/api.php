@@ -7,8 +7,10 @@ use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\EmployeeController;
 use App\Http\Controllers\Api\V1\ExpenseController;
 use App\Http\Controllers\Api\V1\InventoryController;
+use App\Http\Controllers\Api\V1\InvoiceController;
 use App\Http\Controllers\Api\V1\ProductsController;
 use App\Http\Controllers\Api\V1\SaleController;
+use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\TenantController;
 use Illuminate\Support\Facades\Route;
 
@@ -57,6 +59,21 @@ Route::prefix('v1')->group(function () {
             Route::prefix('tenant')->name('tenant.')->group(function () {
                 Route::get('/',    [TenantController::class, 'show'])->name('show');
                 Route::put('/',    [TenantController::class, 'update'])->name('update');
+
+                // Self-service subscription (owner/manager-gated inside controller)
+                Route::get('subscription',  [SubscriptionController::class, 'current'])->name('subscription.current');
+                Route::post('subscription', [SubscriptionController::class, 'change'])->name('subscription.change');
+            });
+
+            // Public-to-tenant catalog of available plans
+            Route::get('plans', [SubscriptionController::class, 'plans'])->name('plans.index');
+
+            // Invoices (billing monitor)
+            Route::prefix('invoices')->name('invoices.')->group(function () {
+                Route::get('/',                  [InvoiceController::class, 'index'])->name('index');
+                Route::get('/{invoice}',         [InvoiceController::class, 'show'])->name('show');
+                Route::post('/{invoice}/pay',    [InvoiceController::class, 'submitReference'])->name('pay');
+                Route::post('/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('cancel');
             });
 
             // Employees (owner/manager only — enforced in controller/request)
@@ -113,6 +130,10 @@ Route::prefix('v1')->group(function () {
             Route::get('plans',            [AdminController::class, 'plans'])->name('plans');
             Route::post('plans',           [AdminController::class, 'createPlan'])->name('plans.create');
             Route::put('plans/{plan}',     [AdminController::class, 'updatePlan'])->name('plans.update');
+
+            Route::get('invoices',                  [AdminController::class, 'invoices'])->name('invoices');
+            Route::post('invoices/{invoice}/verify',[AdminController::class, 'verifyInvoice'])->name('invoices.verify');
+            Route::post('invoices/{invoice}/reject',[AdminController::class, 'rejectInvoice'])->name('invoices.reject');
         });
     });
 });

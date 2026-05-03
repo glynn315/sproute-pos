@@ -82,7 +82,9 @@ class ProductsService
 
     public function adjustStock(Product $product, int $quantity, string $type, ?string $notes = null): Product
     {
-        $before = $product->stock_quantity;
+        // Defensive: coerce a NULL stock to 0 so the inventory log insert
+        // doesn't violate the NOT NULL constraint on quantity_before.
+        $before = (int) ($product->stock_quantity ?? 0);
         $after  = $before + $quantity;
 
         if ($after < 0) {
