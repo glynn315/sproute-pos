@@ -15,10 +15,11 @@ class AdjustStockRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'product_id' => ['required', 'integer', 'exists:products,id'],
-            'quantity'   => ['required', 'integer', 'not_in:0'],
-            'type'       => ['required', Rule::in(['purchase', 'adjustment', 'return'])],
-            'notes'      => ['nullable', 'string', 'max:500'],
+            'product_id'     => ['required', 'integer', 'exists:products,id'],
+            'quantity'       => ['required', 'integer', 'not_in:0'],
+            'type'           => ['required', Rule::in(['purchase', 'adjustment', 'return'])],
+            'notes'          => ['nullable', 'string', 'max:500'],
+            'allow_negative' => ['nullable', 'boolean'],
         ];
     }
 }

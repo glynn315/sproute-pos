@@ -22,18 +22,20 @@ class ProductsService
         $this->ensureBarcodeUnique($dto->tenantId, $dto->barcode);
 
         $product = $this->repo->create([
-            'tenant_id'      => $dto->tenantId,
-            'category_id'    => $dto->categoryId,
-            'name'           => $dto->name,
-            'description'    => $dto->description,
-            'sku'            => $dto->sku,
-            'barcode'        => $dto->barcode,
-            'price'          => $dto->price,
-            'cost_price'     => $dto->costPrice,
-            'stock_quantity' => $dto->stockQuantity,
-            'reorder_level'  => $dto->reorderLevel,
-            'image_url'      => $dto->imageUrl,
-            'is_active'      => true,
+            'tenant_id'       => $dto->tenantId,
+            'category_id'     => $dto->categoryId,
+            'supplier_id'     => $dto->supplierId,
+            'name'            => $dto->name,
+            'description'     => $dto->description,
+            'sku'             => $dto->sku,
+            'barcode'         => $dto->barcode,
+            'price'           => $dto->price,
+            'cost_price'      => $dto->costPrice,
+            'stock_quantity'  => $dto->stockQuantity,
+            'reorder_level'   => $dto->reorderLevel,
+            'expiration_date' => $dto->expirationDate,
+            'image_url'       => $dto->imageUrl,
+            'is_active'       => true,
         ]);
 
         // Log initial stock if provided
@@ -52,7 +54,7 @@ class ProductsService
 
         $this->auditModel('created', $product);
 
-        return $product->load('category');
+        return $product->load(['category', 'supplier']);
     }
 
     public function update(Product $product, UpdateProductDTO $dto): Product
@@ -63,16 +65,18 @@ class ProductsService
         $this->ensureBarcodeUnique($product->tenant_id, $dto->barcode, $product->id);
 
         $updated = $this->repo->update($product, array_filter([
-            'category_id'   => $dto->categoryId,
-            'name'          => $dto->name,
-            'description'   => $dto->description,
-            'sku'           => $dto->sku,
-            'barcode'       => $dto->barcode,
-            'price'         => $dto->price,
-            'cost_price'    => $dto->costPrice,
-            'reorder_level' => $dto->reorderLevel,
-            'image_url'     => $dto->imageUrl,
-            'is_active'     => $dto->isActive,
+            'category_id'     => $dto->categoryId,
+            'supplier_id'     => $dto->supplierId,
+            'name'            => $dto->name,
+            'description'     => $dto->description,
+            'sku'             => $dto->sku,
+            'barcode'         => $dto->barcode,
+            'price'           => $dto->price,
+            'cost_price'      => $dto->costPrice,
+            'reorder_level'   => $dto->reorderLevel,
+            'expiration_date' => $dto->expirationDate,
+            'image_url'       => $dto->imageUrl,
+            'is_active'       => $dto->isActive,
         ], fn ($v) => $v !== null));
 
         $this->auditModel('updated', $updated, $old);
@@ -80,17 +84,26 @@ class ProductsService
         return $updated;
     }
 
-    public function adjustStock(Product $product, int $quantity, string $type, ?string $notes = null): Product
-    {
-        // Defensive: coerce a NULL stock to 0 so the inventory log insert
-        // doesn't violate the NOT NULL constraint on quantity_before.
+    public function adjustStock(
+        Product $product,
+        int $quantity,
+        string $type,
+        ?string $notes = null,
+        bool $allowNegative = false,
+    ): Product {
         $before = (int) ($product->stock_quantity ?? 0);
         $after  = $before + $quantity;
 
-        if ($after < 0) {
-            throw ValidationException::withMessages([
-                'quantity' => ["Insufficient stock. Available: {$before}"],
-            ]);
+        $wentNegative = $after < 0;
+
+        if ($wentNegative) {
+            $user = auth()->user();
+            // Only managers and above may force-override; cashiers cannot.
+            if (! $allowNegative || ! $user?->canManage()) {
+                throw ValidationException::withMessages([
+                    'quantity' => ["Insufficient stock. Available: {$before}"],
+                ]);
+            }
         }
 
         $product->update(['stock_quantity' => $after]);
@@ -106,7 +119,13 @@ class ProductsService
             'notes'           => $notes,
         ]);
 
-        $this->audit('stock_adjusted', 'Product', $product->id, ['stock' => $before], ['stock' => $after]);
+        $this->audit(
+            action:    $wentNegative ? 'stock_adjusted_with_override' : 'stock_adjusted',
+            entityType:'Product',
+            entityId:  $product->id,
+            oldValues: ['stock' => $before],
+            newValues: ['stock' => $after, 'type' => $type, 'allow_negative' => $allowNegative],
+        );
 
         return $product->fresh();
     }

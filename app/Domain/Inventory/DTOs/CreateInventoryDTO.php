@@ -11,15 +11,17 @@ readonly class CreateInventoryDTO
         public int     $quantity,
         public string  $type,
         public ?string $notes,
+        public bool    $allowNegative = false,
     ) {}
 
     public static function fromRequest(AdjustStockRequest $request): self
     {
         return new self(
-            productId: $request->validated('product_id'),
-            quantity:  (int) $request->validated('quantity'),
-            type:      $request->validated('type', 'adjustment'),
-            notes:     $request->validated('notes'),
+            productId:     $request->validated('product_id'),
+            quantity:      (int) $request->validated('quantity'),
+            type:          $request->validated('type', 'adjustment'),
+            notes:         $request->validated('notes'),
+            allowNegative: (bool) ($request->validated('allow_negative') ?? false),
         );
     }
 }

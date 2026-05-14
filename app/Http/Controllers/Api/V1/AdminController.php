@@ -77,6 +77,27 @@ class AdminController extends Controller
         return $this->success(new TenantResource($updated), 'Subscription assigned');
     }
 
+    /**
+     * Replace the entire enabled-modules list for a tenant.
+     *
+     * PUT /api/v1/admin/tenants/{tenant}/modules
+     * Body: { "modules": ["pos", "eatery"] }
+     */
+    public function updateModules(Request $request, int $tenant): JsonResponse
+    {
+        $data = $request->validate([
+            'modules'   => ['required', 'array'],
+            // Validate against the live module registry — adding a new module
+            // in /admin/modules instantly makes it assignable here.
+            'modules.*' => ['string', 'exists:modules,name'],
+        ]);
+
+        $t = $this->repo->findByIdOrFail($tenant);
+        $t->setModules($data['modules']);
+
+        return $this->success(new TenantResource($t->fresh()), 'Modules updated');
+    }
+
     // ─── Subscription Plans ───────────────────────────────────────────────────
 
     public function plans(): JsonResponse

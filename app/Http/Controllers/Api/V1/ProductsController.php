@@ -54,7 +54,22 @@ class ProductsController extends Controller
             return $this->notFound('Product not found');
         }
 
-        return $this->success(new ProductResource($prod->load('category')));
+        return $this->success(new ProductResource($prod->load(['category', 'supplier'])));
+    }
+
+    public function findByBarcode(Request $request, string $code): JsonResponse
+    {
+        $prod = $this->repo->findByBarcodeForTenant($request->user()->tenant_id, $code);
+
+        if (! $prod) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Product not found',
+                'barcode' => $code,
+            ], 404);
+        }
+
+        return $this->success(new ProductResource($prod));
     }
 
     public function update(UpdateProductRequest $request, int $product): JsonResponse

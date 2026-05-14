@@ -11,6 +11,7 @@ class Product extends Model
     protected $fillable = [
         'tenant_id',
         'category_id',
+        'supplier_id',
         'name',
         'description',
         'sku',
@@ -19,6 +20,7 @@ class Product extends Model
         'cost_price',
         'stock_quantity',
         'reorder_level',
+        'expiration_date',
         'image_url',
         'is_active',
     ];
@@ -26,11 +28,12 @@ class Product extends Model
     protected function casts(): array
     {
         return [
-            'price'          => 'decimal:2',
-            'cost_price'     => 'decimal:2',
-            'stock_quantity' => 'integer',
-            'reorder_level'  => 'integer',
-            'is_active'      => 'boolean',
+            'price'           => 'decimal:2',
+            'cost_price'      => 'decimal:2',
+            'stock_quantity'  => 'integer',
+            'reorder_level'   => 'integer',
+            'expiration_date' => 'date',
+            'is_active'       => 'boolean',
         ];
     }
 
@@ -42,6 +45,11 @@ class Product extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
     }
 
     public function saleItems(): HasMany

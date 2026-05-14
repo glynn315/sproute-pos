@@ -20,6 +20,7 @@ class TenantResource extends JsonResource
             'secondary_color'     => $this->secondary_color,
             'status'              => $this->status,
             'is_verified'         => $this->isVerified(),
+            'modules'             => $this->modules ?? [],
             'subscription_plan'   => new SubscriptionPlanResource($this->whenLoaded('subscriptionPlan')),
             'subscription_ends_at'=> $this->subscription_ends_at?->toIso8601String(),
             'has_active_subscription' => $this->hasActiveSubscription(),

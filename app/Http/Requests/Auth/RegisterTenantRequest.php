@@ -20,6 +20,9 @@ class RegisterTenantRequest extends FormRequest
             'password'   => ['required', 'string', 'min:8', 'confirmed'],
             'phone'      => ['nullable', 'string', 'max:20'],
             'address'    => ['nullable', 'string', 'max:500'],
+            'modules'    => ['nullable', 'array'],
+            // Validate against the registered, active modules table — not a hardcoded list.
+            'modules.*'  => ['string', 'exists:modules,name'],
         ];
     }
 }

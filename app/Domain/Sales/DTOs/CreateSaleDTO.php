@@ -16,6 +16,8 @@ readonly class CreateSaleDTO
         public float   $discountAmount,
         public float   $taxAmount,
         public ?string $notes,
+        public bool    $asDraft = false,
+        public ?array  $payments = null,
     ) {}
 
     public static function fromRequest(CreateSaleRequest $request, User $user): self
@@ -25,10 +27,12 @@ readonly class CreateSaleDTO
             userId:         $user->id,
             items:          $request->validated('items'),
             paymentMethod:  $request->validated('payment_method', 'cash'),
-            amountPaid:     (float) $request->validated('amount_paid'),
+            amountPaid:     (float) ($request->validated('amount_paid') ?? 0),
             discountAmount: (float) ($request->validated('discount_amount') ?? 0),
             taxAmount:      (float) ($request->validated('tax_amount') ?? 0),
             notes:          $request->validated('notes'),
+            asDraft:        (bool) ($request->validated('as_draft') ?? false),
+            payments:       $request->validated('payments'),
         );
     }
 }

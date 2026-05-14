@@ -6,7 +6,12 @@ use App\Domain\Sales\DTOs\CreateSaleDTO;
 use App\Domain\Sales\Repositories\SaleRepository;
 use App\Domain\Sales\Services\SaleService;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Sales\CommitSaleRequest;
 use App\Http\Requests\Sales\CreateSaleRequest;
+use App\Http\Requests\Sales\RefundSaleRequest;
+use App\Http\Requests\Sales\SuspendSaleRequest;
+use App\Http\Resources\ReceiptResource;
+use App\Http\Resources\SaleRefundResource;
 use App\Http\Resources\SaleResource;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -36,7 +41,12 @@ class SaleController extends Controller
             CreateSaleDTO::fromRequest($request, $request->user())
         );
 
-        return $this->created(new SaleResource($sale), 'Sale completed');
+        $isDraft = $sale->status === 'draft';
+
+        return $this->created(
+            new SaleResource($sale),
+            $isDraft ? 'Draft sale saved' : 'Sale completed'
+        );
     }
 
     public function show(Request $request, int $sale): JsonResponse
@@ -50,6 +60,74 @@ class SaleController extends Controller
         return $this->success(new SaleResource($s));
     }
 
+    public function suspend(SuspendSaleRequest $request, int $sale): JsonResponse
+    {
+        $s = $this->repo->findForTenant($request->user()->tenant_id, $sale);
+        if (! $s) {
+            return $this->notFound('Sale not found');
+        }
+
+        $suspended = $this->saleService->suspend($s, $request->validated('note'), $request->user()->id);
+
+        return $this->success(new SaleResource($suspended), 'Sale suspended');
+    }
+
+    public function resume(Request $request, int $sale): JsonResponse
+    {
+        $s = $this->repo->findForTenant($request->user()->tenant_id, $sale);
+        if (! $s) {
+            return $this->notFound('Sale not found');
+        }
+
+        if (! $s->isDraft()) {
+            return $this->error('Only draft sales can be resumed.', 422);
+        }
+
+        return $this->success(new SaleResource($s), 'Draft loaded');
+    }
+
+    public function commit(CommitSaleRequest $request, int $sale): JsonResponse
+    {
+        $s = $this->repo->findForTenant($request->user()->tenant_id, $sale);
+        if (! $s) {
+            return $this->notFound('Sale not found');
+        }
+
+        $committed = $this->saleService->commitDraft($s, $request->validated(), $request->user()->id);
+
+        return $this->success(new SaleResource($committed), 'Sale completed');
+    }
+
+    public function refund(RefundSaleRequest $request, int $sale): JsonResponse
+    {
+        $s = $this->repo->findForTenant($request->user()->tenant_id, $sale);
+        if (! $s) {
+            return $this->notFound('Sale not found');
+        }
+
+        $refund = $this->saleService->refund(
+            $s,
+            $request->validated('items'),
+            $request->validated('reason'),
+            $request->validated('refund_method'),
+            $request->user()->id,
+        );
+
+        return $this->success(new SaleRefundResource($refund), 'Refund processed');
+    }
+
+    public function receipt(Request $request, int $sale): JsonResponse
+    {
+        $s = $this->repo->findForTenant($request->user()->tenant_id, $sale);
+        if (! $s) {
+            return $this->notFound('Sale not found');
+        }
+
+        $payload = $this->saleService->buildReceipt($s);
+
+        return $this->success(new ReceiptResource($payload));
+    }
+
     public function void(Request $request, int $sale): JsonResponse
     {
         if (! $request->user()->canManage()) {
@@ -57,7 +135,6 @@ class SaleController extends Controller
         }
 
         $s = $this->repo->findForTenant($request->user()->tenant_id, $sale);
-
         if (! $s) {
             return $this->notFound('Sale not found');
         }

@@ -19,6 +19,7 @@ use App\Traits\ApiResponse;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -48,14 +49,15 @@ class AuthController extends Controller
 
     public function login(LoginRequest $request): JsonResponse
     {
+        Log::info('Login attempt data:', $request->all());
         try {
             $result = $this->authService->login(LoginDTO::fromRequest($request));
 
             return $this->success([
                 'access_token'  => $result['access_token'],
                 'refresh_token' => $result['refresh_token'],
-                'token_type'    => $result['token_type'],
-                'expires_in'    => $result['expires_in'],
+                'token_type' => $result['token_type'] ?? 'Bearer',
+                'expires_in'    => $result['expires_in'] ?? 7200,
                 'user'          => new UserResource($result['user']),
             ], 'Login successful');
         } catch (AuthenticationException $e) {

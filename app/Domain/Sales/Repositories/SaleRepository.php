@@ -9,7 +9,12 @@ class SaleRepository
 {
     public function paginateForTenant(int $tenantId, int $perPage = 20, array $filters = []): LengthAwarePaginator
     {
-        $query = Sale::with(['user:id,name', 'items.product:id,name,cost_price'])
+        $query = Sale::with([
+                'user:id,name',
+                'items.product:id,name,cost_price',
+                'payments',
+                'refunds.items',
+            ])
             ->where('tenant_id', $tenantId);
 
         if (! empty($filters['status'])) {
@@ -37,7 +42,13 @@ class SaleRepository
 
     public function findForTenant(int $tenantId, int $saleId): ?Sale
     {
-        return Sale::with(['user:id,name', 'items.product:id,name,cost_price'])
+        return Sale::with([
+                'user:id,name',
+                'items.product:id,name,cost_price',
+                'payments',
+                'refunds.items',
+                'refunds.refundedBy:id,name',
+            ])
             ->where('tenant_id', $tenantId)
             ->find($saleId);
     }

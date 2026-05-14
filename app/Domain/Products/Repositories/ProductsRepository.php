@@ -10,7 +10,7 @@ class ProductsRepository
 {
     public function paginateForTenant(int $tenantId, int $perPage = 20, array $filters = []): LengthAwarePaginator
     {
-        $query = Product::with('category')
+        $query = Product::with(['category', 'supplier'])
             ->where('tenant_id', $tenantId);
 
         if (isset($filters['is_active'])) {
@@ -33,7 +33,7 @@ class ProductsRepository
 
     public function allActiveForTenant(int $tenantId): Collection
     {
-        return Product::with('category')
+        return Product::with(['category', 'supplier'])
             ->where('tenant_id', $tenantId)
             ->where('is_active', true)
             ->orderBy('name')
@@ -45,6 +45,14 @@ class ProductsRepository
         return Product::where('tenant_id', $tenantId)->find($productId);
     }
 
+    public function findByBarcodeForTenant(int $tenantId, string $barcode): ?Product
+    {
+        return Product::with(['category', 'supplier'])
+            ->where('tenant_id', $tenantId)
+            ->where('barcode', $barcode)
+            ->first();
+    }
+
     public function create(array $data): Product
     {
         return Product::create($data);
@@ -53,7 +61,7 @@ class ProductsRepository
     public function update(Product $product, array $data): Product
     {
         $product->update(array_filter($data, fn ($v) => $v !== null));
-        return $product->fresh('category');
+        return $product->fresh(['category', 'supplier']);
     }
 
     public function delete(Product $product): void
@@ -63,7 +71,7 @@ class ProductsRepository
 
     public function lowStockForTenant(int $tenantId): Collection
     {
-        return Product::with('category')
+        return Product::with(['category', 'supplier'])
             ->where('tenant_id', $tenantId)
             ->where('is_active', true)
             ->whereColumn('stock_quantity', '<=', 'reorder_level')

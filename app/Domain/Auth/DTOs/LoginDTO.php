@@ -10,14 +10,16 @@ readonly class LoginDTO
         public string $email,
         public string $password,
         public ?string $deviceName,
+        public string $deviceId,
     ) {}
 
     public static function fromRequest(LoginRequest $request): self
     {
         return new self(
-            email:      $request->validated('email'),
-            password:   $request->validated('password'),
+            email: $request->validated('email'),
+            password: $request->validated('password'),
             deviceName: $request->validated('device_name'),
+            deviceId: $request->device_id,
         );
     }
 }

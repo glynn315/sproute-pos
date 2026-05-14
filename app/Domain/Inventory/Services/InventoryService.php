@@ -16,6 +16,12 @@ class InventoryService
             ->where('id', $dto->productId)
             ->firstOrFail();
 
-        return $this->productService->adjustStock($product, $dto->quantity, $dto->type, $dto->notes);
+        return $this->productService->adjustStock(
+            product:       $product,
+            quantity:      $dto->quantity,
+            type:          $dto->type,
+            notes:         $dto->notes,
+            allowNegative: $dto->allowNegative,
+        );
     }
 }

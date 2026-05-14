@@ -9,6 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Tenant extends Model
 {
+    public const MODULE_POS    = 'pos';
+    public const MODULE_EATERY = 'eatery';
+
+    public const AVAILABLE_MODULES = [self::MODULE_POS, self::MODULE_EATERY];
+
     protected $fillable = [
         'name',
         'email',
@@ -18,6 +23,7 @@ class Tenant extends Model
         'primary_color',
         'secondary_color',
         'status',
+        'modules',
         'subscription_plan_id',
         'subscription_ends_at',
     ];
@@ -25,8 +31,36 @@ class Tenant extends Model
     protected function casts(): array
     {
         return [
+            'modules'              => 'array',
             'subscription_ends_at' => 'datetime',
         ];
+    }
+
+    public function hasModule(string $module): bool
+    {
+        return in_array($module, $this->modules ?? [], true);
+    }
+
+    public function setModules(array $modules): self
+    {
+        $clean = array_values(array_intersect(self::AVAILABLE_MODULES, array_unique($modules)));
+        $this->update(['modules' => $clean]);
+        return $this;
+    }
+
+    public function enableModule(string $module): self
+    {
+        if (! in_array($module, self::AVAILABLE_MODULES, true)) return $this;
+        $next = array_values(array_unique([...($this->modules ?? []), $module]));
+        $this->update(['modules' => $next]);
+        return $this;
+    }
+
+    public function disableModule(string $module): self
+    {
+        $next = array_values(array_diff($this->modules ?? [], [$module]));
+        $this->update(['modules' => $next]);
+        return $this;
     }
 
     // ─── Relationships ────────────────────────────────────────────────────────

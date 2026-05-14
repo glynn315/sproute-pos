@@ -24,9 +24,15 @@ class SaleResource extends JsonResource
             'change_amount'      => (float) $this->change_amount,
             'payment_method'     => $this->payment_method,
             'status'             => $this->status,
+            'is_draft'           => $this->status === 'draft',
+            'suspended_at'       => $this->suspended_at?->toIso8601String(),
+            'suspension_note'    => $this->suspension_note,
             'notes'              => $this->notes,
             'items'              => SaleItemResource::collection($this->whenLoaded('items')),
             'items_count'        => $this->whenLoaded('items', fn () => $this->items->count()),
+            'payments'           => SalePaymentResource::collection($this->whenLoaded('payments')),
+            'refunds'            => SaleRefundResource::collection($this->whenLoaded('refunds')),
+            'total_refunded'     => $this->whenLoaded('refunds', fn () => (float) $this->refunds->sum('total_refunded')),
             'created_at'         => $this->created_at->toIso8601String(),
         ];
     }

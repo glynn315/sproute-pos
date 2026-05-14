@@ -13,10 +13,16 @@ readonly class RegisterTenantDTO
         public string  $password,
         public ?string $phone,
         public ?string $address,
+        public array   $modules = ['pos'],
     ) {}
 
     public static function fromRequest(RegisterTenantRequest $request): self
     {
+        $modules = $request->validated('modules');
+        if (empty($modules)) {
+            $modules = ['pos'];
+        }
+
         return new self(
             storeName: $request->validated('store_name'),
             ownerName: $request->validated('owner_name'),
@@ -24,6 +30,7 @@ readonly class RegisterTenantDTO
             password:  $request->validated('password'),
             phone:     $request->validated('phone'),
             address:   $request->validated('address'),
+            modules:   array_values(array_unique($modules)),
         );
     }
 }

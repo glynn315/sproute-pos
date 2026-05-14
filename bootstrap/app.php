@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureActiveSubscription;
 use App\Http\Middleware\EnsureSuperAdmin;
+use App\Http\Middleware\EnsureTenantHasModule;
 use App\Http\Middleware\EnsureTenantVerified;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -20,11 +21,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'tenant.verified'    => EnsureTenantVerified::class,
-            'subscription.active'=> EnsureActiveSubscription::class,
+            'subscription.active' => EnsureActiveSubscription::class,
             'admin'              => EnsureSuperAdmin::class,
+            'module'             => EnsureTenantHasModule::class,
         ]);
 
-        $middleware->statefulApi();
+        // $middleware->statefulApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Return JSON for API authentication errors

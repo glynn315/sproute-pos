@@ -13,6 +13,7 @@ use App\Traits\AuditLogger;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\UnauthorizedException;
 
@@ -29,11 +30,12 @@ class AuthService
     {
         return DB::transaction(function () use ($dto) {
             $tenant = Tenant::create([
-                'name'   => $dto->storeName,
-                'email'  => $dto->email,
-                'phone'  => $dto->phone,
-                'address'=> $dto->address,
-                'status' => 'pending',
+                'name'    => $dto->storeName,
+                'email'   => $dto->email,
+                'phone'   => $dto->phone,
+                'address' => $dto->address,
+                'status'  => 'pending',
+                'modules' => $dto->modules,
             ]);
 
             $owner = User::create([
@@ -52,7 +54,7 @@ class AuthService
             return [
                 'tenant'            => $tenant,
                 'user'              => $owner,
-                'verification_token'=> $verification->token,
+                'verification_token' => $verification->token,
             ];
         });
     }
@@ -99,7 +101,7 @@ class AuthService
             throw new AuthenticationException('Your store account is pending verification.');
         }
 
-        return $this->issueTokens($user, $dto->deviceName ?? 'api');
+        return $this->issueTokens($user, $dto->deviceName, $dto->deviceId);
     }
 
     // ─── PIN Login ────────────────────────────────────────────────────────────
@@ -188,16 +190,28 @@ class AuthService
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    private function issueTokens(User $user, string $deviceName): array
+    private function issueTokens(User $user, ?string $deviceName, ?string $deviceId = null): array
     {
-        // Revoke old access tokens to enforce single session per device
-        $user->tokens()->where('name', $deviceName)->delete();
+        $device = $deviceId ?: $deviceName ?: 'api';
 
-        $accessToken = $user->createToken($deviceName, ['*'], now()->addHours(2));
+        // 🔥 Single-device session: nuke every existing Sanctum token AND
+        // every refresh-token row for this user. Other devices using old
+        // tokens will 401, their refresh will fail (row gone), and the
+        // interceptor will log them out.
+        DB::transaction(function () use ($user) {
+            $user->tokens()->delete();
+            RefreshToken::where('user_id', $user->id)->delete();
+        });
 
-        $rawRefresh  = Str::random(64);
+        // 🔑 New access token (Sanctum, opaque). Expires in 2h.
+        $accessToken = $user->createToken($device, ['*'], now()->addHours(2));
+
+        // 🔁 New refresh token (30-day, hashed at rest).
+        $rawRefresh = Str::random(64);
+
         RefreshToken::create([
             'user_id'    => $user->id,
+            'device_id'  => $device,
             'token_hash' => hash('sha256', $rawRefresh),
             'expires_at' => now()->addDays(self::REFRESH_TOKEN_TTL_DAYS),
             'ip_address' => request()->ip(),
@@ -206,14 +220,17 @@ class AuthService
 
         $user->update(['last_login_at' => now()]);
 
-        $this->audit('login', 'User', $user->id, null, null, $user->tenant_id, $user->id);
+        $this->audit('login', 'User', $user->id, null, [
+            'device' => $device,
+            'ip'     => request()->ip(),
+        ], $user->tenant_id, $user->id);
 
         return [
             'access_token'  => $accessToken->plainTextToken,
             'refresh_token' => $rawRefresh,
             'token_type'    => 'Bearer',
             'expires_in'    => 7200,
-            'user'          => $user->load('tenant.subscriptionPlan'),
+            'user'          => $user,
         ];
     }
 

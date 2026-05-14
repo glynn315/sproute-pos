@@ -18,10 +18,11 @@ class DemoStoreSeeder extends Seeder
         $tenant = Tenant::updateOrCreate(
             ['email' => 'store@baligya.com'],
             [
-                'name' => 'Baligya Demo Store',
-                'phone' => '09171234567',
-                'address' => 'Cebu City',
-                'status' => 'verified',
+                'name'                 => 'Baligya Demo Store',
+                'phone'                => '09171234567',
+                'address'              => 'Cebu City',
+                'status'               => 'verified',
+                'modules'              => ['pos', 'eatery'],
                 'subscription_plan_id' => $plan?->id,
                 'subscription_ends_at' => now()->addYear(),
             ],
