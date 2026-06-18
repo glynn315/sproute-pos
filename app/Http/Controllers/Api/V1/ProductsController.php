@@ -41,7 +41,10 @@ class ProductsController extends Controller
 
     public function store(CreateProductRequest $request): JsonResponse
     {
-        $product = $this->productService->create(CreateProductsDTO::fromRequest($request));
+        $product = $this->productService->create(
+            CreateProductsDTO::fromRequest($request),
+            $request->user()->tenant,
+        );
 
         return $this->created(new ProductResource($product), 'Product created');
     }

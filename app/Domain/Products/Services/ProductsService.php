@@ -7,6 +7,7 @@ use App\Domain\Products\DTOs\UpdateProductDTO;
 use App\Domain\Products\Repositories\ProductsRepository;
 use App\Models\InventoryLog;
 use App\Models\Product;
+use App\Models\Tenant;
 use App\Traits\AuditLogger;
 use Illuminate\Validation\ValidationException;
 
@@ -16,8 +17,14 @@ class ProductsService
 
     public function __construct(private readonly ProductsRepository $repo) {}
 
-    public function create(CreateProductsDTO $dto): Product
+    public function create(CreateProductsDTO $dto, Tenant $tenant): Product
     {
+        if (! $tenant->canAddProduct()) {
+            throw ValidationException::withMessages([
+                'product' => ["Maximum product limit ({$tenant->maxProducts()}) reached for your plan. Upgrade to add more."],
+            ]);
+        }
+
         $this->ensureSkuUnique($dto->tenantId, $dto->sku);
         $this->ensureBarcodeUnique($dto->tenantId, $dto->barcode);
 

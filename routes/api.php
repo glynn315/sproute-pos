@@ -84,6 +84,12 @@ Route::prefix('v1')->group(function () {
                 Route::post('/{invoice}/cancel', [InvoiceController::class, 'cancel'])->name('cancel');
             });
 
+            // ─── Active-subscription-gated routes ─────────────────────────────
+            // Everything below requires a live subscription. The routes ABOVE
+            // (tenant profile, plans, invoices) stay open so a tenant whose plan
+            // has lapsed can still log in, review usage, and renew.
+            Route::middleware('subscription.active')->group(function () {
+
             // Employees (owner/manager only — enforced in controller/request)
             Route::apiResource('employees', EmployeeController::class);
 
@@ -195,6 +201,8 @@ Route::prefix('v1')->group(function () {
                     Route::get('monthly', [EateryDashboardController::class, 'monthly'])->name('monthly');
                 });
             });
+
+            }); // end subscription.active group
         });
 
         // ─── Super Admin Routes ───────────────────────────────────────────────

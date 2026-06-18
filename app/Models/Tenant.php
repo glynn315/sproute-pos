@@ -152,4 +152,36 @@ class Tenant extends Model
     {
         return $this->employeeCount() < $this->maxEmployees();
     }
+
+    public function productCount(): int
+    {
+        return $this->products()->count();
+    }
+
+    /** Plan product cap. -1 means unlimited; 0 when the tenant has no plan. */
+    public function maxProducts(): int
+    {
+        return $this->subscriptionPlan?->max_products ?? 0;
+    }
+
+    public function hasUnlimitedProducts(): bool
+    {
+        return $this->maxProducts() === -1;
+    }
+
+    public function canAddProduct(): bool
+    {
+        return $this->hasUnlimitedProducts() || $this->productCount() < $this->maxProducts();
+    }
+
+    /** Remaining headroom for UI / responses. null = unlimited. */
+    public function remainingProducts(): ?int
+    {
+        return $this->hasUnlimitedProducts() ? null : max(0, $this->maxProducts() - $this->productCount());
+    }
+
+    public function remainingEmployees(): int
+    {
+        return max(0, $this->maxEmployees() - $this->employeeCount());
+    }
 }
